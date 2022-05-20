@@ -1,0 +1,169 @@
+import json
+
+def title_data_make():
+    #with open('./part-c000.json','r',encoding='utf8')as fp:
+    #    title_data = json.load(fp)
+    #title_data=open('./part-c000.json','r',encoding='utf-8')
+    title_data=open('./part-c000.json','r',encoding='utf-8')
+    
+
+    t=0
+
+    #title as caption
+    data=[]
+    for line in title_data.readlines():
+        i=json.loads(line)
+        d={}
+        d["videoID"]=i["feedid"]
+        d["enCap"]=[i["asr"].replace('\n','')]
+        d["chCap"]=[i["title"].replace('\n','')]
+        if len(d["chCap"][0])==0:
+            continue
+        data.append(d)
+        
+        #if t>5:break
+        #t+=1
+    #print(data)
+
+    with open('data/title_training.json','w',encoding='utf8')as fp:
+        json.dump(data,fp,ensure_ascii=False)
+
+
+def query_data_make():
+    title_data=open('./part-c000.json','r',encoding='utf-8')
+    
+
+    t=0
+
+    #title as caption
+    data=[]
+    for line in title_data.readlines():
+        i=json.loads(line)
+        d={}
+        d["videoID"]=i["feedid"]
+        d["enCap"]=[i["asr"].replace('\n','')]
+
+        with open('datayewu/docid_query_pair.json','r',encoding='utf-8') as file:
+            docid_query_pair=json.load(file)
+        d["chCap"]=[docid_query_pair[i["doc_id"]]]
+        if len(d["chCap"][0])<10:
+            continue
+        data.append(d)
+
+        if t>5:break
+        t+=1
+    #print(data)
+
+    with open('datayewu/query_training.json','w',encoding='utf8')as fp:
+        json.dump(data,fp,ensure_ascii=False)
+
+#title_data_make()
+#query_data_make()
+
+
+import numpy as np
+import os
+def write_feedid_txt():
+    path='D:/remain_feature/'
+    l=os.listdir(path)
+    for i in l:
+        f=open('D:/remain.txt','a')
+        f.write('\n'+i.split('.')[0])
+        f.close()
+def write_docid_txt():
+    query_data=open('./part-c000.json','r',encoding='utf-8')
+    t=0
+    data=[]
+    for line in query_data.readlines():
+        i=json.loads(line)
+        f=open('D:/query_docid.txt','a')
+        f.write('\n'+i["docid"])
+        f.close()
+def write_docid_query_pair():
+    query_data=open('./part-c000.json','r',encoding='utf-8')
+    t=0
+    data={}
+    for line in query_data.readlines():
+        i=json.loads(line)
+        data[i["docid"]]=i["normal_query"]
+    with open('datayewu/docid_query_pair.json','w',encoding='utf8')as fp:
+        json.dump(data,fp,ensure_ascii=False)
+
+#write_docid_txt()
+#write_docid_query_pair()
+
+
+def change_npy(name):
+    data=np.load('D:/remain_feature/'+name+'.npy')
+    #print(data)
+    data_shape=data.shape #(114/106/112,512)
+    if data_shape[0]>=32:
+        data=data[:32,:]
+    data=np.expand_dims(data,0)
+    #print(data.shape)
+    np.save('D:/remain_post/'+name+'.npy',data)
+def change_npy_all():
+    path='D:/remain_feature/'
+    l=os.listdir(path)
+
+    with open('data/title_training.json','r',encoding='utf-8') as file:
+        data=json.load(file)
+        
+    for i in data:
+        #print(i['videoID'])
+        if i['videoID']+'.npy' in l:
+            change_npy(i['videoID'])
+        else:
+            print(i['videoID'])
+    
+#change_npy_all()
+    
+
+
+from keybert import KeyBERT
+import jieba
+
+# doc = """
+#          Supervised learning is the machine learning task of learning a function that
+#          maps an input to an output based on example input-output pairs. It infers a
+#          function from labeled training data consisting of a set of training examples.
+#          In supervised learning, each example is a pair consisting of an input object
+#          (typically a vector) and a desired output value (also called the supervisory signal).
+#          A supervised learning algorithm analyzes the training data and produces an inferred function,
+#          which can be used for mapping new examples. An optimal scenario will allow for the
+#          algorithm to correctly determine the class labels for unseen instances. This requires
+#          the learning algorithm to generalize from the training data to unseen situations in a
+#          'reasonable' way (see inductive bias).
+#       """
+
+#doc = "本期视频我们来讲讲一个重大利好，近期的政策对策很明确：国家想把最低工资提升到足以一个全职工人及其家庭免于贫困的水平，就能扩大对无子女劳动者的工资所得税减免。"
+doc = "为什么说我剩下的根源弄懂这句话，你会活得更通透一些，这是所有高手获得高速成长的核心密码，我认为这句话有两层含义，简单讲这句话的内核是引导我们做一个内向型思维的人，那什么是内向型思维的人呢？这类人都有一个共同的特质，自信的能力，唯有自信才会使人发现自己的错误和不足，不再重蹈覆辙。找到自己合适的方向，核心是向内求拥有这种能力的人呢，在职场中或者是工作中都是非常受欢迎的，像自律是引导我们如何管理好自己，我认为这句话是比自律更高一个维度的，不只是教我们如何管理好自己，更深一步讲，你对这句话的理解就是你对人事物的态度，把这句话放在自己的心里并运用到生活中的。"
+docl = " ".join(jieba.cut(doc, cut_all=False))
+kw_model = KeyBERT()
+keywords = kw_model.extract_keywords(docl, keyphrase_ngram_range=(1,4))
+print("keywords:",keywords)
+
+keylist=[]
+for i in keywords:
+    keylist.append(''.join(i[0].split(' ')))
+keydoc='。'.join(keylist)+'。'
+
+
+from transformers import pipeline
+translator1 = pipeline("translation", model="Helsinki-NLP/opus-mt-zh-en")
+summarizer = pipeline("summarization", model="sshleifer/distilbart-cnn-12-6")
+translator2 = pipeline("translation", model="Helsinki-NLP/opus-mt-en-zh")
+def summary(doc):
+    #doc = "本期视频我们来讲讲一个重大利好。近期的政策对策很明确。国家想把最低工资提升到足以一个全职工人及其家庭免于贫困的水平。就能扩大对无子女劳动者的工资所得税减免。"
+    #keydoc = "国家最低工资提升。明确国家最低工资。国家最低工资。利好近期政策。近期政策对策。"
+    doc = translator1(doc)[0]['translation_text']
+    summar = summarizer(doc, min_length=5, max_length=13) #max_length=20
+    summar = summar[0]['summary_text']
+    doc = translator2(summar)
+    return doc
+
+ssumm=summary(doc)
+print('summary:', ssumm)
+keydoc = keydoc + ssumm[0]['translation_text'] + '。'
+print(keydoc)
+print('both:', summary(keydoc))
